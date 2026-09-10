@@ -1,0 +1,6 @@
+# Environment & secrets
+.env
+private-key.pem
+*-service-account*.json
+node_modules/
+layout.json
