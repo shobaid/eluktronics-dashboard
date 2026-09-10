@@ -218,6 +218,50 @@ app.post('/api/gsc', async (req, res) => {
   }
 });
 
+// ── OAuth Setup ───────────────────────────────────────────────────────────
+if (AUTH_MODE === 'oauth') {
+  app.get('/setup', (req, res) => {
+    const hasToken = !!process.env.GOOGLE_REFRESH_TOKEN;
+    res.send(`<!DOCTYPE html><html><head><title>Dashboard Setup</title>
+<style>body{font-family:system-ui,sans-serif;background:#0f1117;color:#f0ede8;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+.card{background:#1a1d24;border:1px solid #2a2d35;border-radius:12px;padding:2.5rem;max-width:440px;width:100%;text-align:center}
+h1{font-size:22px;margin:0 0 8px}p{color:#9ca3af;font-size:14px;margin:0 0 24px}
+.btn{display:inline-flex;align-items:center;gap:8px;background:#4285f4;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none}
+.success{color:#34d399;font-size:14px;margin-top:16px}</style></head>
+<body><div class="card"><h1>Dashboard Setup</h1>
+<p>Connect your Google account to authorize this dashboard to pull GA4 and Search Console data.</p>
+${hasToken ? '<div class="success">✅ Google account connected. Dashboard is ready.</div><br><a href="/" class="btn">Go to Dashboard</a>'
+: '<a href="/auth/google" class="btn">Connect Google Account</a>'}</div></body></html>`);
+  });
+
+  app.get('/auth/google', (req, res) => {
+    const client = getOAuthClient();
+    const url = client.generateAuthUrl({
+      access_type: 'offline', prompt: 'consent',
+      scope: ['https://www.googleapis.com/auth/analytics.readonly','https://www.googleapis.com/auth/webmasters.readonly']
+    });
+    res.redirect(url);
+  });
+
+  app.get('/auth/callback', async (req, res) => {
+    try {
+      const { code } = req.query;
+      const client = getOAuthClient();
+      const { tokens } = await client.getToken(code);
+      res.send(`<!DOCTYPE html><html><head><title>Connected</title>
+<style>body{font-family:system-ui,sans-serif;background:#0f1117;color:#f0ede8;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+.card{background:#1a1d24;border:1px solid #2a2d35;border-radius:12px;padding:2.5rem;max-width:540px;width:100%}
+h1{color:#34d399;margin:0 0 16px}.token{background:#0f1117;border:1px solid #2a2d35;border-radius:6px;padding:12px;font-family:monospace;font-size:12px;word-break:break-all;margin:12px 0}
+</style></head><body><div class="card">
+<h1>✅ Google Account Connected!</h1>
+<p style="color:#9ca3af;font-size:13px">Add this as <strong>GOOGLE_REFRESH_TOKEN</strong> in Vercel environment variables, then redeploy:</p>
+<div class="token">${tokens.refresh_token || '(token refreshed — already set)'}</div>
+<p style="color:#9ca3af;font-size:12px">After adding it in Vercel → Settings → Environment Variables, redeploy and visit <a href="/setup" style="color:#4285f4">/setup</a> to confirm.</p>
+</div></body></html>`);
+    } catch(e) { res.status(500).send('OAuth error: ' + e.message); }
+  });
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`\n✅ Eluktronics Dashboard running at http://localhost:${PORT}\n`));
 module.exports = app;
